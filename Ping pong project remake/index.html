@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+ <!-- Решил отказаться от html5 canvas в пользу подержки в старых браузерах -->
+<html>
+	<head>
+		<meta charset="utf-8">
+		<link rel="stylesheet" type="text/css" href="css/reset.css">
+		<link rel="stylesheet" type="text/css" href="css/style.css">
+		<title>Ping Pong</title>
+		<script type="text/javascript" src="js/game.js"></script>
+	</head>
+	<body>
+		<div id="wrapper">
+			<div id="header">
+				<div class="logo">
+					Ping-Pong Game
+				</div>
+			</div>
+			<ul id="menu">
+				<li class="button start" > 
+					<a href="#">Start</a> <!-- Псевдо класс :hover работает в IE 6 только для ссылок-->
+				</li>
+				<li class="button stop" > 
+					<a href="#">Pause</a>
+				</li>
+				<li class="button retry" > 
+					<a href="#">Retry</a>
+				</li>
+			</ul>
+			<div id="game-field">  <!--Блок игрового поля-->
+				<div id="info-box">   <!--Блок для вывода игровых сообщений-->
+					<div class="messege"> 
+						<span>
+							Messege
+						</span>	
+					</div>
+				</div>
+					<div id="first-reflector">&nbsp;</div> <!--Явно указать что блоки не пустые, на будущее можно добавить вместо цвета картинку-->
+					<img src="images/ball.png" id="ball" >
+					<div id="second-reflector">&nbsp;</div>
+			</div>
+			<div id="score">  <!--Блок для вывода счёта-->
+				Score: <span id="first-player-score">0</span> | <span id="second-player-score">0</span>  
+			</div>
+			<div id="footer">  <!--На всякий случай-->
+				<div class="footer-info">
+					Some Text
+				</div>
+			</div>
+		</div>
+	</body>
+</html>
