@@ -55,6 +55,7 @@ body {
 #game-field {
 	position:relative;
 	height:70%;
+	clear: both;
 }
 
 #info-box {
@@ -118,6 +119,7 @@ body {
 #menu {
 	margin:5px 0;
 	height:30px;
+	width: 300px;
 }
 
 #menu a {
@@ -161,6 +163,13 @@ body {
 	text-decoration:underline;
 }
 
+.game-timer {
+	float: right;
+	width: 300px;
+	margin-top: 5px;
+	font: bold 28px monospace;
+	color:#D6D8FF;
+}
 /*Стили вывода счёта*/
 
 #score {

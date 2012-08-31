@@ -1,37 +1,43 @@
-/*
-	Тестовая игрушка, проверялось на IE 9, Chrome 18, Firefox 14, Safari 5, Opera 12
+/**
+ *Тестовая игрушка, проверялось на IE 9, Chrome 18, Firefox 14, Safari 5, Opera 12
 */
+ 
+var GAME_SETTINGS = {
+	firstPlayerSpeed: 10,
+	secondPlayerSpeed: 10,
+	fieldGoalMargin:10,
+	ballSpeed:10,
+	gameAnimationDelay: 30, 
+	gameTimeAfterGoal: {
+		minuts:0,
+		seconds:3
+	},
+	gameMaxScore:10
+};
 
-/*
- * Эдакий универсальный способ подписки на событие
- * elem - элемент, к которому будем привязывать событие
- * evType - тип события (например: "click","mouseover")
- * call - функция-обработчик (можно анонимную)
+/**
+  * Эдакий универсальный способ подписки на событие
+  * @elem {object} - элемент, к которому будем привязывать событие
+  * @evType {string} - тип события (например: "click","mouseover")
+  * @call {function} - функция-обработчик (можно анонимную)
  */
  
-function addEvent(elem,evType,call)
-{
-     if(elem.addEventListener)
-     {  
+function addEvent(elem,evType,call) {
+     if(elem.addEventListener) {  
         elem.addEventListener(evType, call, false);
-     } 
-     else if(elem.attachEvent) 
-     {  
+     } else if(elem.attachEvent) {  
         elem.attachEvent('on' + evType, call); 
      }                
 } 
 
-/* Соаздаём игроков второй аргумент - скорость движения площадки */
-var first_player = new Player(10);
-var second_player = new Player(10);
-/*Заносим переменную поля в глобалы*/
-var field = new Field(); 
+var first_player = new Player(GAME_SETTINGS.firstPlayerSpeed);
+var second_player = new Player(GAME_SETTINGS.secondPlayerSpeed);
+var field = new Field(GAME_SETTINGS.fieldGoalMargin); 
 
-/* Продписка на события для движения площадок и для инициализации игры при полной загрузке страницы */
-addEvent(window,'load',function(){ Game.init() });
-/*Решение для клавиатуры слабо-кроссбраузерное*/
+addEvent(window,'load',function() { 
+	Game.init() 
+});
 addEvent(window,'keydown',handlerKeyDown);
-//addEvent(window,'keypress',handler);
 addEvent(window,'keyup',handlerKeyUp);
 
 
@@ -39,17 +45,13 @@ addEvent(window,'keyup',handlerKeyUp);
 	Выполнение действйи за один кадр определяется флагами функций т.е. для каждой функции которая должна выполена в кадре флаг истина, для отсальных ложь 
 */
 function handlerKeyDown(event) {  
-	/* Костыль для IE */
 	if ( typeof event == "undefined") {
  		e = window.event; 
 	}
  	var e = e || event;
-	/* Костыль для FireFox*/
  	var code = e.keyCode || e.charCode;
-	/* руский и анлизуий вариант клавиш */
-	//console.log('code = '+code);
+	/* руский и англизуий вариант клавиш */
 	if (code == 65 || code == 97 || code == 1092) {
-		/*Нажали на клавишу и взвели флаг в истину */
 		first_player.reflector.moveFlagUp = true; 
 	}
  	if (code == 90 || code == 122 || code == 1103) {
@@ -65,17 +67,12 @@ function handlerKeyDown(event) {
 
 
 function handlerKeyUp(event) {  
-	/* Костыль для IE */
-	//console.log('test Up');
 	if ( typeof event == "undefined") {
  		e = window.event; 
 	}
  	var e = e || event;
-	/* Костыль для FireFox*/
  	var code = e.keyCode || e.charCode;
-	/* руский и анлизуий вариант клавиш */
 	if (code == 65 || code == 97 || code == 1092) {
-		/*Отжали на клавишу и взвели флаг в лож */
 		first_player.reflector.moveFlagUp = false; 
 	}
  	if (code == 90 || code == 122 || code == 1103) {
@@ -89,19 +86,14 @@ function handlerKeyUp(event) {
 	}	
 }
 
-var Game = {} ; // wrapper
-/* Будем делать таймер как чать объекта игра , он должен:
-	- Начинать игру (в одном такте отрисовки будет отрисовываться не только мяч но и площадки)
-	- Останавливать игру (запрет на отрисовку и вычисление позиций мяча и площадок)
-	- Устанавливать задержку всей анимации 
-	- Иметь Список заданий (статический или динамический?)
-	- Возможность маштабиравания класса таймера
-*/
-Game.intervalId = null; /*Таймер иргы (кадров)*/
-Game.taskList = []; /*Массив фунций на исполнение (будут выполняться за кадр)*/
-Game.delay = 30; 
-Game.TimeAfterGoal = 2000; /*Задержка в 2 секунды после гола*/
-Game.TimerAfterGoalID = null; 
+var Game = {
+	stopwatch: null,
+	intervalId: null, 
+	taskList: [],
+	TimerAfterGoalID: null,
+	busy: false
+};
+
 /*Здесь мы заносим все функции которые должны быть выполнены за 1 кадр в список заданий на исполнение исходя из состояния флагов*/
 Game.taskListInit = function() {
 	if (Ball.moveFlag) {
@@ -119,68 +111,52 @@ Game.taskListInit = function() {
 	if (second_player.reflector.moveFlagDown) {
 		Game.taskList.push(function() { second_player.moveDown() });
 	}
-	//console.log('Game.taskListInit');
 }
 
-/*После того как кадр отработан надо сбросить флаги в значение по умолчанию и почистить список задач*/
+/*После того как кадр отработан почистить список задач*/
 Game.taskListDefault = function() {
 	Game.taskList = [];
-	/*first_player.reflector.moveFlagUp = false;
-	first_player.reflector.moveFlagDown = false;
-	second_player.reflector.moveFlagUp = false;
-	second_player.reflector.moveFlagDown = false; */
-	//console.log('Game.taskListDefault');
 }
 
-/*Наша функция отрисовки , она начинает отрисовку*/
 Game.renderingStart =  function() {
-	//console.log('Game.renderingStart');
 	Game.frame = function() {
-		//console.log('Game.frameStart');
-		Game.taskListInit(); /*Записываем на исполнение*/
+		Game.taskListInit(); 
 		var taskListLength = Game.taskList.length;
 		for(var i = 0; i < taskListLength; i++) {
 			var task = Game.taskList[i];
-			task(); /*исполняем*/
+			task();
 		}
-		/*Сбрасываем в значение по умолчанию*/
 		Game.taskListDefault();
 	}
 	
 	Game.intervalId = setInterval(function() {
 		Game.frame();
-	},Game.delay); 
+	}, GAME_SETTINGS.gameAnimationDelay); 
 }
 
-/*Функция останавливает отрисовку*/
 Game.renderingStop = function() {
-	if (Game.intervalId) { // чтобы остановить интервал
+	if (Game.intervalId) { 
 		clearInterval(Game.intervalId);
-		Game.intervalId = null; /*Обязательно сбросить*/
+		Game.intervalId = null;
 	}
 }
 
 
 
 Game.init = function() {
-	/*Инициализируем игровое поле*/
 	field.init('game-field'); 
-	/*Ставим в начальные позиции плозщадки*/
 	setReflectorsInStartPosition();
-	Ball(10); // создаём мяч,  аргумент - скороть движения мяча
-	/*Ставим мяч по центру поля*/
+	Ball(GAME_SETTINGS.ballSpeed); 
 	Ball.setInStartPosition();
-	Ball.startDirection(); //Задаём произвольное направление
-	/*Не забываем связять рокетки и игроков*/
+	Ball.startDirection();
 	first_player.connectReflector('first-reflector');  
 	second_player.connectReflector('second-reflector');
 	first_player.connectScoreText('first-player-score');
 	second_player.connectScoreText('second-player-score');
-	/* Определяем упраляюшие кнопки */
+	Game.stopwatch = new Stopwatch(document.getElementById('game-timer'));
 	var start_button = document.getElementById('menu').children[0];
 	var pause_button = document.getElementById('menu').children[1];
 	var retry_button = document.getElementById('menu').children[2];
-	/* Подписываемся для них на события */
 	addEvent(start_button,'click',Game.start);
 	addEvent(pause_button,'click',Game.pause);
 	addEvent(retry_button,'click',Game.retry);
@@ -190,55 +166,63 @@ Game.init = function() {
 
 
 Game.start = function() { 
-	/*Защита от дурака - при конце игры запретить продолжение игры (нажать кнопку статра) она будет работать только в том случае если нажмут кнопень (retry) */
-	if (Round.isGone == false) {
-		Game.messegeClear(); // стереть сообщения если были
+	/*Защита от дурака - при конце игры запретить продолжение игры (нажать кнопку статра)
+	 * или паузы она будет работать только в том случае если нажмут кнопень (retry) 
+	 */
+	if ( (Round.isGone == false) && (Game.busy ==false) ) {
+		Game.messegeClear(); 
 		Ball.moveFlag = true;
-		Ball.show(); // лишним не будет
-		/*Тут начинает работать отрисовка*/
+		Ball.show(); 
 		Game.renderingStart();
+		Game.stopwatch.start();
+		Game.busy = true;
 	}	
 }
 
 Game.stop = function() { 
-	/*Защита от дурака -  при нажатии кнопки стоп нельзя менять положение площадок*/
 	Game.renderingStop();
+	if (Game.TimerAfterGoalID) {
+		    timer.stop();  
+		    Game.TimerAfterGoalID = null;
+	}
 }
 
 Game.pause = function() {
-	/*Выводим сообщение о паузе*/
 	if (Round.isGone == false) {
-		Game.messege('Pause');
+		Game.messegeClear();
 		Game.stop();
+		setTimeout(function(){ Game.messege('Pause') }, 10); //Блокирует баг с отрисовкой в Chrome и Safari 
+		Game.stopwatch.stop();
+		Game.busy = false;
 	}
 }
 
 Game.retry = function() {
-	/*Стираем все сообщения*/
-	Game.messegeClear();  
+	Game.messegeClear(); 
+	Game.stop(); 
+	Game.stopwatch.stop();
+	Game.stopwatch.reset();
+	Game.stopwatch.timeRefresh();
 	Ball.setInStartPosition();
 	setReflectorsInStartPosition();
 	Ball.startDirection();
-	/*Сбрасываем счёт игроков*/
 	first_player.resetScore(); 
 	second_player.resetScore(); 
 	Ball.show();
-	Game.renderingStop();
 	Round.isGone = false;
+	Game.busy = false;
 	
 }
 
 /*Метод вывода игрового сообщения*/
 Game.messege = function(messege) {
-	/*Получаем доступ к элементу сообщения*/
 	var infobox = document.getElementById('info-box');
 	var msg = document.getElementById('info-box').children[0].children[0];
-	msg.innerHTML = messege; // включаем сообщение
-	infobox.style.display = 'block'; // включаем затемнение игрового поля
+	msg.innerHTML = messege; 
+	infobox.style.display = 'block'; 
 }
 
 Game.messegeClear = function() {
-	/*Просто убирвем блок со страницы*/
 	var infobox = document.getElementById('info-box');
 	infobox.style.display = 'none';
 }
@@ -250,32 +234,72 @@ Round.isGone = false;
 
 Round.End = function() {	 
 	var winner = '';
-	if (first_player.score == 10) {
-		winner = '<span style = "color:#FF2819;">Red</span>'; // Добавляем победителя
-	} else if (second_player.score == 10) {
+	if (first_player.score >= GAME_SETTINGS.gameMaxScore) {
+		winner = '<span style = "color:#FF2819;">Red</span>'; 
+	} else if (second_player.score >= GAME_SETTINGS.gameMaxScore) {
 		winner = '<span style = "color:#66FF4F;">Green</span>';
 	}
-	Game.messege('The Winner is '+winner);
+
 	Game.stop();
-	/*Рещил спрятать мяч*/
+	Game.messege('The Winner is '+winner);
 	Ball.hide(); 
 	/*Включам защиту от дурака*/
 	Round.isGone = true;
 }
 
-Round.isEnd = function() { // проверка на конец раунда
-	return ((first_player.score == 10) || (second_player.score == 10) );
+Round.isEnd = function() { 
+	return ((first_player.score == GAME_SETTINGS.gameMaxScore) || (second_player.score == GAME_SETTINGS.gameMaxScore) );
 }
 
-/*Сначала хотел оформлять все инициализаторы как функции-конструкторы но отказался от этой задумки */
+function Stopwatch(elem) {
+	var intervalID;
+	var seconds = minuts = 0;
+	function print() {
+		function addZero(i) {
+	    	return i < 10 ? '0' : '';
+		}
+	   	return addZero(minuts) + minuts + ':' + addZero(seconds) + seconds;
+	};
+
+	this.timeRefresh = function() {
+		elem.innerHTML = print();
+	};
+
+	this.tick = function() {
+	 	if (seconds == 59) {
+	      	seconds = 0;
+	      	minuts++;
+	    } else {
+	      	seconds++;
+	    }
+		elem.innerHTML = print();
+	};
+
+	this.start = function() {
+	    elem.innerHTML = print();
+	    intervalID = setInterval(function() {
+	      Stopwatch.obj.tick();
+	    }, 1000);
+	};
+
+	this.stop = function() {
+	    clearInterval(intervalID);
+	    intervalID = null;
+	};
+
+	this.reset = function() {
+		// Stopwatch.obj.stop();
+		seconds = minuts = 0;
+	};
+	Stopwatch.obj = this;
+};
 
 function Field(goalMargin) {
-	var goalMargin = goalMargin || 10; // отступ от левой и правой стороны поля после которого будет засчитан гол
-	this.self = null; /*Работаем с замыканием поэтому явно вынес свойство экземпляра*/
+	var goalMargin = goalMargin || 10; 
+	this.self = null; 
 	this.init = function(id) {
 		this.self = document.getElementById(id);
 	} 
-	/*Получить расстояние на котором засчитывают гол*/
 	this.goalMarginLeft = function() {  
 		return goalMargin;
 	}
@@ -285,21 +309,21 @@ function Field(goalMargin) {
 	}	
 }
 
-/*Сделал с прикидкой на будущее*/
-var Menu = {};
-
-/*Инициализатор мяча аргумент это скорость мяча*/
+/** Иницаилизатор мяча
+ * @speed {numder} скорость мяча
+ */
 function Ball(speed) { 
 	var ball = document.getElementById('ball');
 	Ball.speed = speed || 5;  
-	/*Значение по умолчанию*/
 	Ball.height = parseInt(ball.offsetHeight);
 	Ball.width = parseInt(ball.offsetWidth);
-	Ball.vx = 0;  // смещение по координатным осям
+	// смещение по координатным осям
+	Ball.vx = 0;  
 	Ball.vy = 0;
-	Ball.moveFlag = false; // флаг движения мячф в кадре
+	Ball.moveFlag = false; 
 	
-	Ball.setInStartPosition = function() { /*Ставим по центру поля*/
+	Ball.setInStartPosition = function() { 
+		/*Ставим по центру поля*/
 		ball.style.left = Math.round(parseInt(field.self.clientWidth) / 2 - parseInt(ball.offsetWidth) / 2) + 'px';
 		ball.style.top = Math.round(parseInt(field.self.clientHeight) / 2 - parseInt(ball.offsetHeight) / 2) + 'px';
 	}
@@ -314,8 +338,8 @@ function Ball(speed) {
 
 }
 
-/*Определяем направление мяча (свеху-вниз/снизу-вверх)*/
-Ball.topToDown = function() { // направление движения мяча по OY 
+
+Ball.topToDown = function() { 
 	return (Ball.vy > 0 );
 }
 
@@ -358,134 +382,165 @@ Ball.startDirection = function() {
 	/*Ищем желательный градусный угол*/
 	do {
 	var degr = random(0, 360);
-	//console.log(degr);
-	} while ((degr >= 0 && degr <= 30) || (degr >= 80 && degr <= 100) || (degr >=150  && degr <= 210) || (degr >= 260 && degr <= 280) || (degr >=330  && degr <= 360));
-	//console.log('--------');
+	} while ((degr >= 0 && degr <= 30) || (degr >= 80 && degr <= 100) || 
+	(degr >=150  && degr <= 210) || (degr >= 260 && degr <= 280) || (degr >=330  && degr <= 360));
+
 	var angle = degr * Math.PI / 180; 
-	// счтиаем угол в радианах
 	
-	Ball.vx = Math.round(Ball.speed * Math.sin(angle)); // смещение по ОХ  , кстати sin cos в диапозоне [0,1]
-	Ball.vy = -Math.round(Ball.speed * Math.cos(angle)); // здесь '-' потому что косинус - отножение гипотенузы (вестора скорости) к прилежажему катету получается верхний катет
+	Ball.vx = Math.round(Ball.speed * Math.sin(angle)); 
+	Ball.vy = -Math.round(Ball.speed * Math.cos(angle)); 
 }
 
-/*Для того чтобы можно было блокировать проверки на отражения*/
-/*
-	Задумака обойти баг с застреванием:
-	сделал указатель опасной ситуации т.е когда происходит застревание (происходит оно тогда когда мячик залазит на рокетку
-	и срабатывает условие отражения по оси OX или OY)
-	тоесть если, всё же случилась такая ситуация, то нужно 1  раз задать направление (чтобы выбраться за пределы шарика) и 1 ход не выполнять проверки на условия отражения.
-*/
+function Timer(seconds, minuts) {
+	function print() {
+	function addZero(i) {
+	    return i < 10 ? '0' : '';
+	}
+	   	return addZero(minuts) + minuts + ':' + addZero(seconds) + seconds;
+	};
+
+	this.tick = function() {
+	 	if (seconds === 0 && minuts !== 0) {
+	      	seconds = 59;
+	      	minuts--;
+	    } else {
+	      	seconds--
+	    }
+	Game.messege( print() );
+	    if (minuts === 0 && seconds === 0) {
+	   	  	clearInterval(Game.TimerAfterGoalID);
+	      	Game.messegeClear();
+	      	Ball.show();
+	      	Ball.setInStartPosition();
+	      	Game.renderingStart();
+	      	Game.TimerAfterGoalID = null;
+	      	Game.stopwatch.start();
+	    };
+	};
+
+	this.start = function() {
+	    Game.messege( print() );
+	    Game.TimerAfterGoalID = setInterval(function() {
+	      Timer.obj.tick();
+	    }, 1000);
+	};
+
+	this.stop = function() {
+	    clearInterval(Game.TimerAfterGoalID);
+	    Game.TimerAfterGoalID = null;
+	    Game.messegeClear();
+	    Ball.setInStartPosition();
+	  };
+	Timer.obj = this;
+};
+
+var timer;
 
 Ball.move = function() {
-	 
-		/*Если забили гол то через 2 секунды будет начат следуший раунд*/
-		if (isGoal()) { 
-			Ball.startDirection();
-			Ball.setInStartPosition();
-			Ball.moveFlag = false;
-			Game.TimerAfterGoalID = setTimeout(function() { // та самая задержка в 2 секунды из условия
-				Ball.moveFlag = true;
-			}, Game.TimeAfterGoal); 
-		}
-		
-		/*Попытка обойти баг с застриванием мяча в рокетке*/
-		
-		var	reflectOX = reflectionOX(),
-			reflectOY = reflectionOY();
-		var	reflectOXOY = (!(reflectOX) && !(reflectOY) && reflectionOXOY());
-			/*Идея в том что если возникает опасная ситуация (когда мячиу может застрять в рокетке) то нужно изменить направление 
-			мячика на правильное и выкинуть мячик за пределы рокетки (выкидывать мы будет двойным изменением положения мячика за 1 проход )  */	
-			if ( (Ball.hitTest(first_player.reflector.self) || Ball.hitTest(second_player.reflector.self)) && reflectOX ) {
+
+	if (isGoal()) { 
+		Ball.startDirection();
+		setReflectorsInStartPosition();
+		Game.renderingStop();
+		Ball.hide();
+		Game.stopwatch.stop();
+		Game.stopwatch.reset();
+		timer = new Timer( GAME_SETTINGS.gameTimeAfterGoal.seconds, GAME_SETTINGS.gameTimeAfterGoal.minuts );
+		timer.start();	
+	}
+
+	var	reflectOX = reflectionOX(),
+		reflectOY = reflectionOY();
+	var	reflectOXOY = (!(reflectOX) && !(reflectOY) && reflectionOXOY());
+		/*Идея в том что если возникает опасная ситуация (когда мячик может застрять в рокетке) то нужно изменить направление 
+		мячика на правильное и выкинуть мячик за пределы рокетки (выкидывать мы будет двойным изменением положения мячика за 1 проход )*/	
+		if ( (Ball.hitTest(first_player.reflector.self) || Ball.hitTest(second_player.reflector.self)) && reflectOX ) {
+			Ball.vx = -Ball.vx;
+			Ball.setLeft(Ball.getLeft() + Ball.vx);
+		} else 	if ( (Ball.hitTest(first_player.reflector.self) || Ball.hitTest(second_player.reflector.self)) && reflectOY ) {
+			Ball.vy = -Ball.vy;
+			Ball.setTop(Ball.getTop() + Ball.vy);
+		} else {
+			if (reflectOX) { 
 				Ball.vx = -Ball.vx;
-				Ball.setLeft(Ball.getLeft() + Ball.vx);
-				//console.log('Warning: OX ');
-			} else 	if ( (Ball.hitTest(first_player.reflector.self) || Ball.hitTest(second_player.reflector.self)) && reflectOY ) {
-				Ball.vy = -Ball.vy;
-				Ball.setTop(Ball.getTop() + Ball.vy);
-				//console.log('Warning: OY');
-			} else {
-				if (reflectOX) { // проверка на отружения по осям
-					Ball.vx = -Ball.vx;
-					//console.log('OX: true');
-				}
-				if (reflectOY) {
-					Ball.vy = -Ball.vy;
-					//console.log('OY: true');	
-				}
-
-				if (reflectOXOY) { // самый последний вариант
-					Ball.vx = -Ball.vx;
-					Ball.vy = -Ball.vy;
-					//console.log('OXOY: true');
-				}
 			}
-		//console.log('-----------');
-		Ball.setLeft(Ball.getLeft() + Ball.vx); // изменяем позицию мячика с учётом смещения по осям
+			if (reflectOY) {
+				Ball.vy = -Ball.vy;
+			}
+			if (reflectOXOY) {
+				Ball.vx = -Ball.vx;
+				Ball.vy = -Ball.vy;
+			}
+		}
+		Ball.setLeft(Ball.getLeft() + Ball.vx); 
 		Ball.setTop(Ball.getTop() + Ball.vy);
-	
-
-	 // if (!Ball.moveInterval)устанавливаем интервал для создания анимации даижения мяча
-		//Ball.moveInterval = setInterval(fly, 30);
 }
 
-Ball.hitTest = function(obj) { // функция проверки залез ли мяч на обьек, который передаётся в качестве парамета
+/** Функция проверки залазит ли мяч на объект, в нашем случае площадки игроков
+ * @obj {object}
+ * return {boolean}
+ */
+
+Ball.hitTest = function(obj) { 
 	var bounds = {};
 	bounds.left = ball.offsetLeft;
 	bounds.top = ball.offsetTop;
 	bounds.right = bounds.left + ball.offsetWidth;
 	bounds.bottom = bounds.top + ball.offsetHeight;
-	//console.log('bounds: '+bounds.left+' '+bounds.top+' '+bounds.right+' '+bounds.bottom);
 
 	var compare = {};
 	compare.left = obj.offsetLeft;
 	compare.top = obj.offsetTop;
 	compare.right = compare.left + obj.offsetWidth;
 	compare.bottom = compare.top + obj.offsetHeight;
-	//console.log('compare: '+compare.left+' '+compare.top+' '+compare.right+' '+compare.bottom);
 
 	return (!(compare.right < bounds.left || compare.left > bounds.right || compare.bottom < bounds.top || compare.top > bounds.bottom));
 
 }
 
-/*Конструктор игроков*/
+/** Конструктор игроков
+ * @speed {numder} - скорость движения площадок
+ * return {Player}
+ */
 function Player(speed) { 
-	this.reflectorSpeed = speed || 5; /*скороть площадок по умолчанию*/
-	Player.prototype.connectScoreText = function(id) { /*подключить к каждому игроку свой счёт*/
+	this.reflectorSpeed = speed || 5; 
+	Player.prototype.connectScoreText = function(id) { 
 		this.scoreText = document.getElementById(id);
 	}
 	this.locked = false;
 	this.score = 0;
-	Player.prototype.goal = function() { /*Досада всё-таки забили гол*/
+	Player.prototype.goal = function() { 
 		this.score++;
 		this.scoreText.innerHTML = this.score;
 		if (Round.isEnd()) { // Костыль для того чтобы когда забьют последний гол то мяч отстановился и не сработал таймер мяча
-			setTimeout(Round.End,20);
+			setTimeout(Round.End,10);
 		}
 	}
 	Player.prototype.resetScore = function() { 
 		this.score = 0;
 		this.scoreText.innerHTML = this.score;
 	}
-	this.connectReflector = function(id) { /*Подключить площадки к игрокам*/
+	this.connectReflector = function(id) { 
 		this.reflector = new Reflector(id);
-		Player.prototype.moveUp = function() { /*Методы площадок для перемещения */
-			//console.log('progress Up');
-			if ( (this.reflector.getTop() - this.reflectorSpeed >= 0) && (this.locked == false) )  // если млжно двигаться и не заблокирован контроллер
+		Player.prototype.moveUp = function() { 
+			if ( (this.reflector.getTop() - this.reflectorSpeed >= 0) && (this.locked == false) )  
 				this.reflector.setTop(this.reflector.getTop() - this.reflectorSpeed);
 		}
 		Player.prototype.moveDown = function() {
-			//console.log('progress Down '+ field.self.offsetHeight);
-			if ( (this.reflector.getTop() + this.reflector.height + this.reflectorSpeed <= field.self.offsetHeight) && (this.locked == false) ) // аналочино только для низа
+			if ( (this.reflector.getTop() + this.reflector.height + this.reflectorSpeed <= field.self.offsetHeight) && 
+			(this.locked == false) ) 
 				this.reflector.setTop(this.reflector.getTop() + this.reflectorSpeed);
 		}
 	}
 }
 
-/*Функция конструктор рокетки*/
-function Reflector(id) { /*Нужно связать с блоком*/
+/** Функция конструктор рокетки
+ * @id {string} - id-шник плашадки к которой подключен игрок
+ */
+function Reflector(id) { 
 	this.self = document.getElementById(id);
-	this.height = 100;  // можно брать из контролера , но лучше явно 
-	this.width = 20;
+	this.height = this.self.offsetHeight;  
+	this.width = this.self.offsetWidth;
 	Reflector.prototype.getTop = function() {
 		return parseInt(this.self.offsetTop);
 	}
@@ -500,7 +555,7 @@ function Reflector(id) { /*Нужно связать с блоком*/
 	}
 }
 
-setReflectorsInStartPosition = function() { // эта функция не внесена в класс так как устанавоивает в начальное положение обе площадки
+setReflectorsInStartPosition = function() { 
 	var first = document.getElementById('first-reflector');
 	var second = document.getElementById('second-reflector');
 	var styles = window.getComputedStyle(first);
@@ -511,7 +566,8 @@ setReflectorsInStartPosition = function() { // эта функция не вне
 	first.style.top = top;
 	second.style.top = top;
 }
-function random(min, max) { // нормлаьный генератор случайных чисел, для того чтобы крайние числа интервала выпадали с равной вероятностью 
+
+function random(min, max) { 
 	return Math.round((min - 0.5) + Math.random() * (max - min + 1));
 }
 
@@ -548,7 +604,6 @@ function random(min, max) { // нормлаьный генератор случ�
 */
 
 // Логика отражения
-// Логику не стал выносить в отделный класс 
 // см. explain_direction.png
 function reflectionOX() {
 	//Этот блок переменных содержит результат вычисления методов, чтобы они не вызывались постоянно (жалкое подобие оптимизации)
@@ -563,8 +618,6 @@ function reflectionOX() {
 		ballHitSecond = Ball.hitTest(second_player.reflector.self),
 		ballDirTopToDown = Ball.downToTop(),
 		ballDirDownToTop = Ball.topToDown();
-		
-	//console.log('OX: call');
 	return (
 		(
 			(ballLeft + Ball.speed <= 0) || (ballLeft >= (field.self.clientWidth - Ball.width)) // если вылезли за границы поля по OX сомнительно иначе был бы гол, но перестраховаться не помешает
@@ -574,7 +627,7 @@ function reflectionOX() {
 			(ballLeft <= firstPlayerLeft + first_player.reflector.width ) // не залазит за певую ракетку
 			&& 
 			(
-				//thirdBallheight надо для того чтобы верхний левый / правый нижний угол мог выпирать за пределы высоты котетки
+				//thirdBallheight надо для того чтобы верхний левый/правый нижний угол мог выпирать за пределы высоты ротетки
 				(ballTop >= firstPlayerTop - thirdBallheight ) &&  
 				(ballTop + ball.height <= firstPlayerTop + first_player.reflector.height + thirdBallheight )
 			)
@@ -638,8 +691,6 @@ function reflectionOX() {
 		)
 		
 	);
-
-	// return ( (ballLeft + ball.speed <= 0) || (ballLeft >= (field.self.clientWidth - ball.width)) ) ? true : false;
 }
 
 function reflectionOY() { // редкий случай но тоже надо учитывать если мяч попадёт на  меньшие стороны рокеток то надо оразить по OY
@@ -650,9 +701,6 @@ function reflectionOY() { // редкий случай но тоже надо у
 		secondPlayerLeft = second_player.reflector.getLeft(),
 		secondPlayerTop = second_player.reflector.getTop(), 
 		thirdBallwidth = Math.round(Ball.widht / 3);
-		
-	//console.log('OY: call');	
-	
 	return (
 		(
 			(ballTop <= 0) || (ballTop >= (field.self.clientHeight - Ball.height) ) /* Общий случай */
@@ -697,10 +745,10 @@ function reflectionOXOY() { // во всех остальных случаях �
 
 
 
-function isGoal() { // проверка на то забили ли гол
+function isGoal() { 
 	var OX = Ball.getLeft();
-	if (OX + Ball.speed <= field.goalMarginLeft()) { // проверка на то вылши ли за границы
-		first_player.goal(); // забили гол
+	if (OX + Ball.speed <= field.goalMarginLeft()) { 
+		first_player.goal(); 
 	}
 	if (OX + Ball.width >= field.goalMarginRight()) {
 		second_player.goal();
