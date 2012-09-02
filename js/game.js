@@ -32,6 +32,7 @@ function addEvent(elem,evType,call) {
 
 var first_player = new Player(GAME_SETTINGS.firstPlayerSpeed);
 var second_player = new Player(GAME_SETTINGS.secondPlayerSpeed);
+var ball;
 var field = new Field(GAME_SETTINGS.fieldGoalMargin); 
 
 addEvent(window,'load',function() { 
@@ -42,7 +43,8 @@ addEvent(window,'keyup',handlerKeyUp);
 
 
 /* Управляем рокетками для зелёгоно (a,z,ф,я) и для красного (k,m,л,ь) 
-	Выполнение действйи за один кадр определяется флагами функций т.е. для каждой функции которая должна выполена в кадре флаг истина, для отсальных ложь 
+	Выполнение действйи за один кадр определяется флагами функций т.е. 
+	для каждой функции которая должна выполена в кадре флаг истина, для отсальных ложь 
 */
 function handlerKeyDown(event) {  
 	if ( typeof event == "undefined") {
@@ -88,168 +90,164 @@ function handlerKeyUp(event) {
 
 var Game = {
 	stopwatch: null,
-	intervalId: null, 
+	intervalId: null,  
 	taskList: [],
 	TimerAfterGoalID: null,
-	busy: false
+	busy: false,
+	timer: null,
+
+	/**
+	 * Здесь мы заносим все функции которые должны быть 
+	 * выполнены за 1 кадр в список заданий на исполнение исходя из состояния флагов
+	 */
+	taskListInit: function() {
+		if (ball.moveFlag) {
+			Game.taskList.push(ball.move); 
+		}
+		if (first_player.reflector.moveFlagUp) {
+			Game.taskList.push(function() { first_player.moveUp() }); 
+		}	
+		if (first_player.reflector.moveFlagDown) {
+			Game.taskList.push(function() { first_player.moveDown() });
+		}
+		if (second_player.reflector.moveFlagUp) {
+			Game.taskList.push(function() { second_player.moveUp() });
+		}	
+		if (second_player.reflector.moveFlagDown) {
+			Game.taskList.push(function() { second_player.moveDown() });
+		}
+	},
+
+	taskListDefault: function() {
+		Game.taskList = [];
+	},
+
+	renderingStart:  function() {
+		function frame() {
+			Game.taskListInit(); 
+			var taskListLength = Game.taskList.length;
+			for(var i = 0; i < taskListLength; i++) {
+				Game.taskList[i]();
+			}
+			Game.taskListDefault();
+		}
+		
+		Game.intervalId = setInterval(function() {
+			frame();
+		}, GAME_SETTINGS.gameAnimationDelay); 
+	},
+
+	renderingStop: function() {
+		if (Game.intervalId) { 
+			clearInterval(Game.intervalId);
+			Game.intervalId = null;
+		}
+	},
+
+	init: function() {
+		field.init('game-field'); 
+		setReflectorsInStartPosition();
+		ball = new Ball(GAME_SETTINGS.ballSpeed); 
+		ball.setInStartPosition();
+		ball.startDirection();
+		first_player.connectReflector('first-reflector');  
+		second_player.connectReflector('second-reflector');
+		first_player.connectScoreText('first-player-score');
+		second_player.connectScoreText('second-player-score');
+		Game.stopwatch = new Stopwatch(document.getElementById('game-timer'));
+		addEvent(document.getElementById('menu').children[0],'click',Game.start);
+		addEvent(document.getElementById('menu').children[1],'click',Game.pause);
+		addEvent(document.getElementById('menu').children[2],'click',Game.retry);
+	},
+
+	start: function() { 
+		/*Защита от дурака - при конце игры запретить продолжение игры (нажать кнопку статра)
+		 * или паузы она будет работать только в том случае если нажмут кнопень (retry) 
+		 */
+		if ( (Round.isGone == false) && (Game.busy ==false) ) {
+			Game.messegeClear(); 
+			ball.moveFlag = true;
+			ball.show(); 
+			Game.renderingStart();
+			Game.stopwatch.start();
+			Game.busy = true;
+		}	
+	},
+
+	stop: function() { 
+		Game.renderingStop();
+		if (Game.TimerAfterGoalID) {
+			    Game.timer.stop();  
+			    Game.TimerAfterGoalID = null;
+		}
+	},
+
+	pause: function() {
+		if (Round.isGone == false) {
+			Game.messegeClear();
+			Game.stop();
+			setTimeout(function(){ Game.messege('Pause') }, 10); 
+			//Блокирует баг с отрисовкой в Chrome и Safari 
+			Game.stopwatch.stop();
+			Game.busy = false;
+		}
+	},
+
+	retry: function() {
+		Game.messegeClear(); 
+		Game.stop(); 
+		Game.stopwatch.stop();
+		Game.stopwatch.reset();
+		Game.stopwatch.timeRefresh();
+		ball.setInStartPosition();
+		setReflectorsInStartPosition();
+		ball.startDirection();
+		first_player.resetScore(); 
+		second_player.resetScore(); 
+		ball.show();
+		Round.isGone = false;
+		Game.busy = false;
+	},
+
+	/*Метод вывода игрового сообщения*/
+	messege: function(messege) {
+		var infobox = document.getElementById('info-box');
+		var msg = document.getElementById('info-box').children[0].children[0];
+		msg.innerHTML = messege; 
+		infobox.style.display = 'block'; 
+	},
+
+	messegeClear: function() {
+		var infobox = document.getElementById('info-box');
+		infobox.style.display = 'none';
+	}
+
 };
 
-/*Здесь мы заносим все функции которые должны быть выполнены за 1 кадр в список заданий на исполнение исходя из состояния флагов*/
-Game.taskListInit = function() {
-	if (Ball.moveFlag) {
-		Game.taskList.push(Ball.move); 
-	}
-	if (first_player.reflector.moveFlagUp) {
-		Game.taskList.push(function() { first_player.moveUp() }); 
-	}	
-	if (first_player.reflector.moveFlagDown) {
-		Game.taskList.push(function() { first_player.moveDown() });
-	}
-	if (second_player.reflector.moveFlagUp) {
-		Game.taskList.push(function() { second_player.moveUp() });
-	}	
-	if (second_player.reflector.moveFlagDown) {
-		Game.taskList.push(function() { second_player.moveDown() });
-	}
-}
+var Round = {
+	isGone: false,
 
-/*После того как кадр отработан почистить список задач*/
-Game.taskListDefault = function() {
-	Game.taskList = [];
-}
-
-Game.renderingStart =  function() {
-	Game.frame = function() {
-		Game.taskListInit(); 
-		var taskListLength = Game.taskList.length;
-		for(var i = 0; i < taskListLength; i++) {
-			var task = Game.taskList[i];
-			task();
+	End: function() {	 
+		var winner = '';
+		if (first_player.score >= GAME_SETTINGS.gameMaxScore) {
+			winner = '<span style = "color:#FF2819;">Red</span>'; 
+		} else if (second_player.score >= GAME_SETTINGS.gameMaxScore) {
+			winner = '<span style = "color:#66FF4F;">Green</span>';
 		}
-		Game.taskListDefault();
-	}
-	
-	Game.intervalId = setInterval(function() {
-		Game.frame();
-	}, GAME_SETTINGS.gameAnimationDelay); 
-}
 
-Game.renderingStop = function() {
-	if (Game.intervalId) { 
-		clearInterval(Game.intervalId);
-		Game.intervalId = null;
-	}
-}
-
-
-
-Game.init = function() {
-	field.init('game-field'); 
-	setReflectorsInStartPosition();
-	Ball(GAME_SETTINGS.ballSpeed); 
-	Ball.setInStartPosition();
-	Ball.startDirection();
-	first_player.connectReflector('first-reflector');  
-	second_player.connectReflector('second-reflector');
-	first_player.connectScoreText('first-player-score');
-	second_player.connectScoreText('second-player-score');
-	Game.stopwatch = new Stopwatch(document.getElementById('game-timer'));
-	var start_button = document.getElementById('menu').children[0];
-	var pause_button = document.getElementById('menu').children[1];
-	var retry_button = document.getElementById('menu').children[2];
-	addEvent(start_button,'click',Game.start);
-	addEvent(pause_button,'click',Game.pause);
-	addEvent(retry_button,'click',Game.retry);
-	
-}
-
-
-
-Game.start = function() { 
-	/*Защита от дурака - при конце игры запретить продолжение игры (нажать кнопку статра)
-	 * или паузы она будет работать только в том случае если нажмут кнопень (retry) 
-	 */
-	if ( (Round.isGone == false) && (Game.busy ==false) ) {
-		Game.messegeClear(); 
-		Ball.moveFlag = true;
-		Ball.show(); 
-		Game.renderingStart();
-		Game.stopwatch.start();
-		Game.busy = true;
-	}	
-}
-
-Game.stop = function() { 
-	Game.renderingStop();
-	if (Game.TimerAfterGoalID) {
-		    timer.stop();  
-		    Game.TimerAfterGoalID = null;
-	}
-}
-
-Game.pause = function() {
-	if (Round.isGone == false) {
-		Game.messegeClear();
 		Game.stop();
-		setTimeout(function(){ Game.messege('Pause') }, 10); //Блокирует баг с отрисовкой в Chrome и Safari 
-		Game.stopwatch.stop();
-		Game.busy = false;
-	}
-}
+		Game.messege('The Winner is '+winner);
+		ball.hide(); 
+		/*Включам защиту от дурака*/
+		Round.isGone = true;
+	},
 
-Game.retry = function() {
-	Game.messegeClear(); 
-	Game.stop(); 
-	Game.stopwatch.stop();
-	Game.stopwatch.reset();
-	Game.stopwatch.timeRefresh();
-	Ball.setInStartPosition();
-	setReflectorsInStartPosition();
-	Ball.startDirection();
-	first_player.resetScore(); 
-	second_player.resetScore(); 
-	Ball.show();
-	Round.isGone = false;
-	Game.busy = false;
-	
-}
-
-/*Метод вывода игрового сообщения*/
-Game.messege = function(messege) {
-	var infobox = document.getElementById('info-box');
-	var msg = document.getElementById('info-box').children[0].children[0];
-	msg.innerHTML = messege; 
-	infobox.style.display = 'block'; 
-}
-
-Game.messegeClear = function() {
-	var infobox = document.getElementById('info-box');
-	infobox.style.display = 'none';
-}
-
-
-var Round = {};
-
-Round.isGone = false;
-
-Round.End = function() {	 
-	var winner = '';
-	if (first_player.score >= GAME_SETTINGS.gameMaxScore) {
-		winner = '<span style = "color:#FF2819;">Red</span>'; 
-	} else if (second_player.score >= GAME_SETTINGS.gameMaxScore) {
-		winner = '<span style = "color:#66FF4F;">Green</span>';
+	isEnd: function() { 
+		return ((first_player.score == GAME_SETTINGS.gameMaxScore) || 
+			(second_player.score == GAME_SETTINGS.gameMaxScore) );
 	}
 
-	Game.stop();
-	Game.messege('The Winner is '+winner);
-	Ball.hide(); 
-	/*Включам защиту от дурака*/
-	Round.isGone = true;
-}
-
-Round.isEnd = function() { 
-	return ((first_player.score == GAME_SETTINGS.gameMaxScore) || (second_player.score == GAME_SETTINGS.gameMaxScore) );
-}
+};
 
 function Stopwatch(elem) {
 	var intervalID;
@@ -294,103 +292,6 @@ function Stopwatch(elem) {
 	Stopwatch.obj = this;
 };
 
-function Field(goalMargin) {
-	var goalMargin = goalMargin || 10; 
-	this.self = null; 
-	this.init = function(id) {
-		this.self = document.getElementById(id);
-	} 
-	this.goalMarginLeft = function() {  
-		return goalMargin;
-	}
-	
-	this.goalMarginRight = function() { 
-		return this.self.offsetWidth - goalMargin; 
-	}	
-}
-
-/** Иницаилизатор мяча
- * @speed {numder} скорость мяча
- */
-function Ball(speed) { 
-	var ball = document.getElementById('ball');
-	Ball.speed = speed || 5;  
-	Ball.height = parseInt(ball.offsetHeight);
-	Ball.width = parseInt(ball.offsetWidth);
-	// смещение по координатным осям
-	Ball.vx = 0;  
-	Ball.vy = 0;
-	Ball.moveFlag = false; 
-	
-	Ball.setInStartPosition = function() { 
-		/*Ставим по центру поля*/
-		ball.style.left = Math.round(parseInt(field.self.clientWidth) / 2 - parseInt(ball.offsetWidth) / 2) + 'px';
-		ball.style.top = Math.round(parseInt(field.self.clientHeight) / 2 - parseInt(ball.offsetHeight) / 2) + 'px';
-	}
-	
-	Ball.hide = function() {
-		ball.style.display = 'none';
-	}
-	
-	Ball.show = function() {
-		ball.style.display = 'block';
-	}
-
-}
-
-
-Ball.topToDown = function() { 
-	return (Ball.vy > 0 );
-}
-
-Ball.downToTop = function() {
-	return (Ball.vy < 0 );
-}
-
-Ball.getLeft = function() {
-	return ball.offsetLeft;
-}
-
-Ball.getTop = function() {
-	return ball.offsetTop;
-}
-
-Ball.setLeft = function(x) {
-	ball.style.left = x + 'px';
-}
-
-Ball.setTop = function(y) {
-	ball.style.top = y + 'px';
-}
-
-
-Ball.startDirection = function() {
-	/*
-		Координатные оси при таком опредедения направления повёрнуты так что:
-		- 0,360 градусов - вертикально вверх; 
-		- 90 градусов - горизонтально вправо; 
-		- 180 градусов - вертикально вниз;		
-		- 270 градусов - горизонтально влево;	
-		
-		Отсюда выражаем желательные градусные диапозоны:
-		Любой градус который входит в интервал:
-		- от 30 до 80 градусов 
-		- от 100 до 150 градусов
-		- от 210 до 260 градусов
-		- от 280 до 330 градусов
-	*/
-	/*Ищем желательный градусный угол*/
-	do {
-	var degr = random(0, 360);
-	} while ((degr >= 0 && degr <= 30) || (degr >= 80 && degr <= 100) || 
-	(degr >=150  && degr <= 210) || (degr >= 260 && degr <= 280) || (degr >=330  && degr <= 360));
-
-	var angle = degr * Math.PI / 180; 
-	
-	Ball.vx = Math.round(Ball.speed * Math.sin(angle)); 
-	Ball.vy = -Math.round(Ball.speed * Math.cos(angle)); 
-}
-
 function Timer(seconds, minuts) {
 	function print() {
 	function addZero(i) {
@@ -410,8 +311,8 @@ function Timer(seconds, minuts) {
 	    if (minuts === 0 && seconds === 0) {
 	   	  	clearInterval(Game.TimerAfterGoalID);
 	      	Game.messegeClear();
-	      	Ball.show();
-	      	Ball.setInStartPosition();
+	      	ball.show();
+	      	ball.setInStartPosition();
 	      	Game.renderingStart();
 	      	Game.TimerAfterGoalID = null;
 	      	Game.stopwatch.start();
@@ -429,74 +330,180 @@ function Timer(seconds, minuts) {
 	    clearInterval(Game.TimerAfterGoalID);
 	    Game.TimerAfterGoalID = null;
 	    Game.messegeClear();
-	    Ball.setInStartPosition();
+	    ball.setInStartPosition();
 	  };
 	Timer.obj = this;
 };
 
-var timer;
-
-Ball.move = function() {
-
-	if (isGoal()) { 
-		Ball.startDirection();
-		setReflectorsInStartPosition();
-		Game.renderingStop();
-		Ball.hide();
-		Game.stopwatch.stop();
-		Game.stopwatch.reset();
-		timer = new Timer( GAME_SETTINGS.gameTimeAfterGoal.seconds, GAME_SETTINGS.gameTimeAfterGoal.minuts );
-		timer.start();	
+function Field(goalMargin) {
+	var goalMargin = goalMargin || 10; 
+	this.self = null; 
+	this.init = function(id) {
+		this.self = document.getElementById(id);
+	} 
+	this.goalMarginLeft = function() {  
+		return goalMargin;
 	}
-
-	var	reflectOX = reflectionOX(),
-		reflectOY = reflectionOY();
-	var	reflectOXOY = (!(reflectOX) && !(reflectOY) && reflectionOXOY());
-		/*Идея в том что если возникает опасная ситуация (когда мячик может застрять в рокетке) то нужно изменить направление 
-		мячика на правильное и выкинуть мячик за пределы рокетки (выкидывать мы будет двойным изменением положения мячика за 1 проход )*/	
-		if ( (Ball.hitTest(first_player.reflector.self) || Ball.hitTest(second_player.reflector.self)) && reflectOX ) {
-			Ball.vx = -Ball.vx;
-			Ball.setLeft(Ball.getLeft() + Ball.vx);
-		} else 	if ( (Ball.hitTest(first_player.reflector.self) || Ball.hitTest(second_player.reflector.self)) && reflectOY ) {
-			Ball.vy = -Ball.vy;
-			Ball.setTop(Ball.getTop() + Ball.vy);
-		} else {
-			if (reflectOX) { 
-				Ball.vx = -Ball.vx;
-			}
-			if (reflectOY) {
-				Ball.vy = -Ball.vy;
-			}
-			if (reflectOXOY) {
-				Ball.vx = -Ball.vx;
-				Ball.vy = -Ball.vy;
-			}
-		}
-		Ball.setLeft(Ball.getLeft() + Ball.vx); 
-		Ball.setTop(Ball.getTop() + Ball.vy);
+	
+	this.goalMarginRight = function() { 
+		return this.self.offsetWidth - goalMargin; 
+	}	
 }
 
-/** Функция проверки залазит ли мяч на объект, в нашем случае площадки игроков
- * @obj {object}
- * return {boolean}
+/** Иницаилизатор мяча
+ * @speed {numder} скорость мяча
  */
+function Ball(speed) { 
+	var ballEl = document.getElementById('ball');
+	this.speed = speed || 5;  
+	this.height = parseInt(ballEl.offsetHeight);
+	this.width = parseInt(ballEl.offsetWidth);
+	// смещение по координатным осям
+	this.vx = 0;   
+	this.vy = 0;
+	this.moveFlag = false; 
+	
+	this.setInStartPosition = function() { 
+		/*Ставим по центру поля*/
+		ballEl.style.left = Math.round(parseInt(field.self.clientWidth) / 2 - parseInt(ballEl.offsetWidth) / 2) + 'px';
+		ballEl.style.top = Math.round(parseInt(field.self.clientHeight) / 2 - parseInt(ballEl.offsetHeight) / 2) + 'px';
+	};
+	
+	this.hide = function() {
+		ballEl.style.display = 'none';
+	};
+	
+	this.show = function() {
+		ballEl.style.display = 'block';
+	};
+	
+	this.topToDown = function() { 
+		return (Ball.obj.vy > 0 );
+	};
 
-Ball.hitTest = function(obj) { 
-	var bounds = {};
-	bounds.left = ball.offsetLeft;
-	bounds.top = ball.offsetTop;
-	bounds.right = bounds.left + ball.offsetWidth;
-	bounds.bottom = bounds.top + ball.offsetHeight;
+	this.downToTop = function() {
+		return (Ball.obj.vy < 0 );
+	};
 
-	var compare = {};
-	compare.left = obj.offsetLeft;
-	compare.top = obj.offsetTop;
-	compare.right = compare.left + obj.offsetWidth;
-	compare.bottom = compare.top + obj.offsetHeight;
+	this.getLeft = function() {
+		return parseInt(ballEl.style.left);
+	};
 
-	return (!(compare.right < bounds.left || compare.left > bounds.right || compare.bottom < bounds.top || compare.top > bounds.bottom));
+	this.getTop = function() {
+		return parseInt(ballEl.style.top);
+	};
 
+	this.setLeft = function(x) {
+		ballEl.style.left = x + 'px';
+	};
+
+	this.setTop = function(y) {
+		ballEl.style.top = y + 'px';
+	};
+
+	this.startDirection = function() {
+		/*
+			Координатные оси при таком опредедения направления повёрнуты так что:
+			- 0,360 градусов - вертикально вверх; 
+			- 90 градусов - горизонтально вправо; 
+			- 180 градусов - вертикально вниз;		
+			- 270 градусов - горизонтально влево;	
+			
+			Отсюда выражаем желательные градусные диапозоны:
+			Любой градус который входит в интервал:
+			- от 30 до 80 градусов 
+			- от 100 до 150 градусов
+			- от 210 до 260 градусов
+			- от 280 до 330 градусов
+		*/
+		/*Ищем желательный градусный угол*/
+		do {
+		var degr = random(0, 360);
+		} while ((degr >= 0 && degr <= 30) || (degr >= 80 && degr <= 100) || 
+		(degr >=150  && degr <= 210) || (degr >= 260 && degr <= 280) || (degr >=330  && degr <= 360));
+
+		var angle = degr * Math.PI / 180; 
+		
+		Ball.obj.vx = Math.round(Ball.obj.speed * Math.sin(angle)); 
+		Ball.obj.vy = -Math.round(Ball.obj.speed * Math.cos(angle)); 
+	};
+
+	this.move = function() {
+
+		if (isGoal()) { 
+			Ball.obj.startDirection();
+			setReflectorsInStartPosition();
+			Game.renderingStop();
+			Ball.obj.hide();
+			Game.stopwatch.stop();
+			Game.stopwatch.reset();
+			Game.timer = new Timer( GAME_SETTINGS.gameTimeAfterGoal.seconds, 
+				GAME_SETTINGS.gameTimeAfterGoal.minuts );
+			Game.timer.start();	
+		}
+
+		var	reflectOX = reflectionOX(),
+			reflectOY = reflectionOY();
+		var	reflectOXOY = (!(reflectOX) && !(reflectOY) && reflectionOXOY());
+			/*Идея в том что если возникает опасная ситуация (когда мячик может застрять в рокетке) 
+			то нужно изменить направление мячика на правильное и выкинуть мячик за пределы рокетки 
+			(выкидывать мы будет двойным изменением положения мячика за 1 проход )*/	
+			if ( (Ball.obj.hitTest(first_player.reflector.self) || Ball.obj.hitTest(second_player.reflector.self)) && 
+				reflectOX ) {
+				Ball.obj.vx = -Ball.obj.vx;
+				Ball.obj.setLeft(Ball.obj.getLeft() + Ball.obj.vx);
+			} else 	if ( (Ball.obj.hitTest(first_player.reflector.self) || Ball.obj.hitTest(second_player.reflector.self)) && 
+				reflectOY ) {
+				Ball.obj.vy = -Ball.obj.vy;
+				Ball.obj.setTop(Ball.obj.getTop() + Ball.obj.vy);
+			} else {
+				if (reflectOX) { 
+					Ball.obj.vx = -Ball.obj.vx;
+				}
+				if (reflectOY) {
+					Ball.obj.vy = -Ball.obj.vy;
+				}
+				if (reflectOXOY) {
+					Ball.obj.vx = -Ball.obj.vx;
+					Ball.obj.vy = -Ball.obj.vy;
+				}
+			}
+			Ball.obj.setLeft(Ball.obj.getLeft() + Ball.obj.vx); 
+			Ball.obj.setTop(Ball.obj.getTop() + Ball.obj.vy);
+	};
+
+	/** Функция проверки залазит ли мяч на объект, в нашем случае площадки игроков
+	 * @obj {object}
+	 * return {boolean}
+	 */
+
+	this.hitTest = function(obj) { 
+		var bounds = {};
+		bounds.left = ballEl.offsetLeft;
+		bounds.top = ballEl.offsetTop;
+		bounds.right = bounds.left + ballEl.offsetWidth;
+		bounds.bottom = bounds.top + ballEl.offsetHeight;
+
+		var compare = {};
+		compare.left = obj.offsetLeft;
+		compare.top = obj.offsetTop;
+		compare.right = compare.left + obj.offsetWidth;
+		compare.bottom = compare.top + obj.offsetHeight;
+
+		return (!(compare.right < bounds.left || compare.left > bounds.right || 
+			compare.bottom < bounds.top || compare.top > bounds.bottom));
+
+	};
+
+	Ball.obj = this;
 }
+
+
+
+
+
+
+
 
 /** Конструктор игроков
  * @speed {numder} - скорость движения площадок
@@ -512,7 +519,8 @@ function Player(speed) {
 	Player.prototype.goal = function() { 
 		this.score++;
 		this.scoreText.innerHTML = this.score;
-		if (Round.isEnd()) { // Костыль для того чтобы когда забьют последний гол то мяч отстановился и не сработал таймер мяча
+		if (Round.isEnd()) { 
+		// Костыль для того чтобы когда забьют последний гол то мяч отстановился и не сработал таймер мяча
 			setTimeout(Round.End,10);
 		}
 	}
@@ -576,51 +584,62 @@ function random(min, max) {
  *Мяч может отскативать от препядствий в 3х случаях 
  - отражение по оси OX:
 	Для первой рокетки (зелёной):
-	1) в случае если верхний левый угол мяча соприкасается с правой стороной рокетки И находится по высоте в пределах: верхний левый угол ниже 
-	чем верхняя сторона (по OY) минус треть высоты мяча (треть для реалистичности - т.е. если попадёт хотябы на 1 пиксель выше чем 
-	верх рокетки отражаться будет по 2м осям сразу) И нижний левый угол мяча выше чем низ рокетки (по OY) плюс треть высоты мяча.
-	!!! ВАЖНО ОТРАЖАТЬСЯ ПО OX может так же в тех случаях если мяч летит снизу-вверх и попадает не на нижний угол площадки где должен отразиться по обоим осям сразу а
+	1) в случае если верхний левый угол мяча соприкасается с правой стороной рокетки И 
+	находится по высоте в пределах: верхний левый угол ниже 
+	чем верхняя сторона (по OY) минус треть высоты мяча (треть для реалистичности - т.е. 
+	если попадёт хотябы на 1 пиксель выше чем 
+	верх рокетки отражаться будет по 2м осям сразу) И нижний левый угол мяча выше чем низ рокетки 
+	(по OY) плюс треть высоты мяча.
+	!!! ВАЖНО ОТРАЖАТЬСЯ ПО OX может так же в тех случаях если мяч летит снизу-вверх и 
+	попадает не на нижний угол площадки где должен отразиться по обоим осям сразу а
 	на верхний и на оборот, для обоих рокеток соответсвенно. 
 	2) В случае если мяч летит сверху-вних и попадает на нижний угол рокетки.
 	3) В случае елм мяч летит снизу вверх и попадает на вернхий угол рокетки.
 	Для второй рокетки (красной):
-	все пункты аналогично как и для зелёной рокетки, но с учётом зеркального расположения (т.е не верний левый угол мяча , а вернхний правый и т.д.)
+	все пункты аналогично как и для зелёной рокетки, но с учётом зеркального расположения 
+	(т.е не верний левый угол мяча , а вернхний правый и т.д.)
 	Общие правила: 
-	Если мячик удариться о левые и правые стеники поля (при условии если систему голов надо будет отключить)
+	Если мячик удариться о левые и правые стеники поля (при условии если систему голов 
+	надо будет отключить)
  - отражение по оси OY: (Редкий случай но тоже надо учитывать)
 	Для первой ракетки: (зелёной)
-	Эта часть логики делается для того чтобы изменения размеров рокеток не стало причины переделывать логику
-	1) верхний левый угол мяча (по OX) Больше чем левая сторона рокетки и меньше чем правая сторона рокетки минус треть ширины мяча И Мяч касается верхней или
+	Эта часть логики делается для того чтобы изменения размеров рокеток не стало причины 
+	переделывать логику
+	1) верхний левый угол мяча (по OX) Больше чем левая сторона рокетки и меньше чем 
+	правая сторона рокетки минус треть ширины мяча И Мяч касается верхней или
 	нижней стороны рокетки 
 	Для второй рокетки: (красной) 
 	Аналочино как и для зелёной но с учётом зеркального располажения
 	Общие правила: если мяч касается верхней или нижний стенок игрового поля  то он отражается;
  - отражение по оси OXOY: 
-	если не сработает отражение по OX и OY и шарик наедет на первую или вторую площадку то он отразится и по оси OX и по оси OY
-	По первоначально задумке если не сработал первый и второй случаи то обязан сработать третий, однако моя логика основана
-	на том чтобы прежде чем делать ход смотреть на 1 ход вперёд (с учётом смещения) и лиш потом выносить вердикт о отражении в результате возник следущий баг:
-	(сразу я его не заметил) в некторых случаях когда не сработает отражение по OX и OY и шарик наедет на рокетки отразить по обоим осям направление, мячик может
-	застрять в рокетке. 	
+	если не сработает отражение по OX и OY и шарик наедет на первую или вторую площадку то 
+	он отразится и по оси OX и по оси OY
+	По первоначально задумке если не сработал первый и второй случаи то обязан сработать третий, 
+	однако моя логика основана на том чтобы прежде чем делать ход смотреть на 1 ход вперёд 
+	(с учётом смещения) и лиш потом выносить вердикт о отражении в результате возник следущий баг:
+	(сразу я его не заметил) в некторых случаях когда не сработает отражение по OX и OY и шарик 
+	наедет на рокетки отразить по обоим осям направление, мячик может застрять в рокетке. 	
 */
 
 // Логика отражения
 // см. explain_direction.png
 function reflectionOX() {
 	//Этот блок переменных содержит результат вычисления методов, чтобы они не вызывались постоянно (жалкое подобие оптимизации)
-	var ballLeft = Ball.getLeft(),
+	var ballLeft = ball.getLeft(),
 		firstPlayerLeft = first_player.reflector.getLeft(),
 		firstPlayerTop = first_player.reflector.getTop(),
 		secondPlayerLeft = second_player.reflector.getLeft(),
 		secondPlayerTop = second_player.reflector.getTop(),
-		ballTop = Ball.getTop(), 
-		thirdBallheight = Math.round(Ball.height / 3),
-		ballHitFirst = Ball.hitTest(first_player.reflector.self),
-		ballHitSecond = Ball.hitTest(second_player.reflector.self),
-		ballDirTopToDown = Ball.downToTop(),
-		ballDirDownToTop = Ball.topToDown();
+		ballTop = ball.getTop(), 
+		thirdBallheight = Math.round(ball.height / 3),
+		ballHitFirst = ball.hitTest(first_player.reflector.self),
+		ballHitSecond = ball.hitTest(second_player.reflector.self),
+		ballDirTopToDown = ball.downToTop(),
+		ballDirDownToTop = ball.topToDown();
 	return (
 		(
-			(ballLeft + Ball.speed <= 0) || (ballLeft >= (field.self.clientWidth - Ball.width)) // если вылезли за границы поля по OX сомнительно иначе был бы гол, но перестраховаться не помешает
+			(ballLeft + ball.speed <= 0) || (ballLeft >= (field.self.clientWidth - ball.width)) 
+			// если вылезли за границы поля по OX сомнительно иначе был бы гол, но перестраховаться не помешает
 		)
 		|| 
 		(
@@ -634,13 +653,14 @@ function reflectionOX() {
 		)
 		||
 		( 
-			// Проблема в том что откажается по OX OY даже если мяч попадает на вехний край летя снизу в верх и так далее для углов рокеток
-			// соственно это и реализуется учёт направления 
-			// для первой (зелёной) рокетки верхний угол
+			/* Проблема в том что откажается по OX OY даже если мяч попадает на вехний край летя снизу в верх 
+			   и так далее для углов рокеток
+			   соственно это и реализуется учёт направления 
+			   для первой (зелёной) рокетки верхний угол */
 			( ballHitFirst && (ballDirTopToDown) ) 
 			&&
 			(
-				(ballTop >= firstPlayerTop - Ball.height) &&
+				(ballTop >= firstPlayerTop - ball.height) &&
 				(ballTop <= firstPlayerTop ) 
 							
 			)
@@ -651,20 +671,20 @@ function reflectionOX() {
 			( ballHitFirst && (ballDirDownToTop) )
 			&&
 			(
-				(ballTop + Ball.width >= firstPlayerTop + first_player.reflector.height) &&
-				(ballTop + Ball.width <= firstPlayerTop + first_player.reflector.height + Ball.height) 
+				(ballTop + ball.width >= firstPlayerTop + first_player.reflector.height) &&
+				(ballTop + ball.width <= firstPlayerTop + first_player.reflector.height + ball.height) 
 							
 			)
 		) 
 		|| 
 		// почти аналочиная ситуация для второй рокетки 
 		(
-			(ballLeft + Ball.width >= secondPlayerLeft) 
+			(ballLeft + ball.width >= secondPlayerLeft) 
 			&& 
 			(
 				(ballTop >= secondPlayerTop -thirdBallheight) 
 				&& 
-				(ballTop + Ball.height <= secondPlayerTop + second_player.reflector.height +thirdBallheight)
+				(ballTop + ball.height <= secondPlayerTop + second_player.reflector.height +thirdBallheight)
 			)
 		) 
 		|| 
@@ -673,7 +693,7 @@ function reflectionOX() {
 			( ballHitSecond && (ballDirTopToDown) )
 			&&
 			(
-				(ballTop >= secondPlayerTop - Ball.height ) &&
+				(ballTop >= secondPlayerTop - ball.height ) &&
 				(ballTop <= secondPlayerTop ) 
 							
 			)
@@ -684,8 +704,8 @@ function reflectionOX() {
 			&&
 			( 
 				// для второй (красной) рокетки нижний угол
-				(ballTop + Ball.height >= secondPlayerTop + second_player.reflector.height) &&
-				(ballTop + Ball.height <= secondPlayerTop + Ball.height ) 
+				(ballTop + ball.height >= secondPlayerTop + second_player.reflector.height) &&
+				(ballTop + ball.height <= secondPlayerTop + ball.height ) 
 							
 			)
 		)
@@ -693,17 +713,18 @@ function reflectionOX() {
 	);
 }
 
-function reflectionOY() { // редкий случай но тоже надо учитывать если мяч попадёт на  меньшие стороны рокеток то надо оразить по OY
-	var ballLeft = Ball.getLeft(),
-		ballTop = Ball.getTop(), 
+function reflectionOY() { /* редкий случай но тоже надо учитывать если мяч попадёт 
+	на  меньшие стороны рокеток то надо оразить по OY */
+	var ballLeft = ball.getLeft(),
+		ballTop = ball.getTop(), 
 		firstPlayerLeft = first_player.reflector.getLeft(),
 		firstPlayerTop = first_player.reflector.getTop(),
 		secondPlayerLeft = second_player.reflector.getLeft(),
 		secondPlayerTop = second_player.reflector.getTop(), 
-		thirdBallwidth = Math.round(Ball.widht / 3);
+		thirdBallwidth = Math.round(ball.widht / 3);
 	return (
 		(
-			(ballTop <= 0) || (ballTop >= (field.self.clientHeight - Ball.height) ) /* Общий случай */
+			(ballTop <= 0) || (ballTop >= (field.self.clientHeight - ball.height) ) /* Общий случай */
 		) 
 		|| 
 		(
@@ -716,7 +737,7 @@ function reflectionOY() { // редкий случай но тоже надо у
 			&& 
 			(
 				/*И касался верних и нижних сторон рокетки */
-				(ballTop + Ball.height >= firstPlayerTop ) || 
+				(ballTop + ball.height >= firstPlayerTop ) || 
 				(ballTop <= firstPlayerTop + first_player.reflector.height )
 			)
 		) 
@@ -724,12 +745,12 @@ function reflectionOY() { // редкий случай но тоже надо у
 		(
 		/* Аналогично для второй рокетки */
 			(
-				(ballLeft + Ball.width > secondPlayerLeft + thirdBallwidth ) && 
-				(ballLeft + Ball.width < secondPlayerLeft + second_player.reflector.width)
+				(ballLeft + ball.width > secondPlayerLeft + thirdBallwidth ) && 
+				(ballLeft + ball.width < secondPlayerLeft + second_player.reflector.width)
 			) 
 			&& 
 			(
-				(ballTop + Ball.height >= secondPlayerTop ) || 
+				(ballTop + ball.height >= secondPlayerTop ) || 
 				(ballTop <= secondPlayerTop + second_player.reflector.height )
 			)
 		)
@@ -738,7 +759,7 @@ function reflectionOY() { // редкий случай но тоже надо у
 
 
 function reflectionOXOY() { // во всех остальных случаях надо отражать по всем направлениям
-	return (Ball.hitTest(first_player.reflector.self) || Ball.hitTest(second_player.reflector.self)
+	return (ball.hitTest(first_player.reflector.self) || ball.hitTest(second_player.reflector.self)
 	);
 
 }
@@ -746,12 +767,12 @@ function reflectionOXOY() { // во всех остальных случаях �
 
 
 function isGoal() { 
-	var OX = Ball.getLeft();
-	if (OX + Ball.speed <= field.goalMarginLeft()) { 
+	var OX = ball.getLeft();
+	if (OX + ball.speed <= field.goalMarginLeft()) { 
 		first_player.goal(); 
 	}
-	if (OX + Ball.width >= field.goalMarginRight()) {
+	if (OX + ball.width >= field.goalMarginRight()) {
 		second_player.goal();
 	}
-	return (OX + Ball.speed <= field.goalMarginLeft() || OX + Ball.width >= field.goalMarginRight())
+	return (OX + ball.speed <= field.goalMarginLeft() || OX + ball.width >= field.goalMarginRight())
 }
