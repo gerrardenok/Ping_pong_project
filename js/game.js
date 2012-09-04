@@ -30,11 +30,6 @@ function addEvent(elem,evType,call) {
      }                
 } 
 
-var first_player = new Player(GAME_SETTINGS.firstPlayerSpeed);
-var second_player = new Player(GAME_SETTINGS.secondPlayerSpeed);
-var ball;
-var field = new Field(GAME_SETTINGS.fieldGoalMargin); 
-
 addEvent(window,'load',function() { 
 	Game.init() 
 });
@@ -54,16 +49,16 @@ function handlerKeyDown(event) {
  	var code = e.keyCode || e.charCode;
 	/* руский и англизуий вариант клавиш */
 	if (code == 65 || code == 97 || code == 1092) {
-		first_player.reflector.moveFlagUp = true; 
+		Game.first_player.reflector.moveFlagUp = true; 
 	}
  	if (code == 90 || code == 122 || code == 1103) {
-		first_player.reflector.moveFlagDown = true;
+		Game.first_player.reflector.moveFlagDown = true;
 	}	
  	if (code == 75 || code == 107 || code == 1083) {
-		second_player.reflector.moveFlagUp = true;
+		Game.second_player.reflector.moveFlagUp = true;
 	}	
  	if (code == 77 || code == 109 || code == 1100) {
-		second_player.reflector.moveFlagDown = true;
+		Game.second_player.reflector.moveFlagDown = true;
 	}	
 }
 
@@ -75,20 +70,24 @@ function handlerKeyUp(event) {
  	var e = e || event;
  	var code = e.keyCode || e.charCode;
 	if (code == 65 || code == 97 || code == 1092) {
-		first_player.reflector.moveFlagUp = false; 
+		Game.first_player.reflector.moveFlagUp = false; 
 	}
  	if (code == 90 || code == 122 || code == 1103) {
-		first_player.reflector.moveFlagDown = false;
+		Game.first_player.reflector.moveFlagDown = false;
 	}	
  	if (code == 75 || code == 107 || code == 1083) {
-		second_player.reflector.moveFlagUp = false;
+		Game.second_player.reflector.moveFlagUp = false;
 	}	
  	if (code == 77 || code == 109 || code == 1100) {
-		second_player.reflector.moveFlagDown = false;
+		Game.second_player.reflector.moveFlagDown = false;
 	}	
 }
 
 var Game = {
+	first_player: new Player(GAME_SETTINGS.firstPlayerSpeed),
+	second_player: new Player(GAME_SETTINGS.secondPlayerSpeed),
+	ball: null,
+	field: new Field(GAME_SETTINGS.fieldGoalMargin),
 	stopwatch: null,
 	intervalId: null,  
 	taskList: [],
@@ -101,20 +100,20 @@ var Game = {
 	 * выполнены за 1 кадр в список заданий на исполнение исходя из состояния флагов
 	 */
 	taskListInit: function() {
-		if (ball.moveFlag) {
-			Game.taskList.push(ball.move); 
+		if (Game.ball.moveFlag) {
+			Game.taskList.push(Game.ball.move); 
 		}
-		if (first_player.reflector.moveFlagUp) {
-			Game.taskList.push(function() { first_player.moveUp() }); 
+		if (Game.first_player.reflector.moveFlagUp) {
+			Game.taskList.push(function() { Game.first_player.moveUp() }); 
 		}	
-		if (first_player.reflector.moveFlagDown) {
-			Game.taskList.push(function() { first_player.moveDown() });
+		if (Game.first_player.reflector.moveFlagDown) {
+			Game.taskList.push(function() { Game.first_player.moveDown() });
 		}
-		if (second_player.reflector.moveFlagUp) {
-			Game.taskList.push(function() { second_player.moveUp() });
+		if (Game.second_player.reflector.moveFlagUp) {
+			Game.taskList.push(function() { Game.second_player.moveUp() });
 		}	
-		if (second_player.reflector.moveFlagDown) {
-			Game.taskList.push(function() { second_player.moveDown() });
+		if (Game.second_player.reflector.moveFlagDown) {
+			Game.taskList.push(function() { Game.second_player.moveDown() });
 		}
 	},
 
@@ -145,15 +144,15 @@ var Game = {
 	},
 
 	init: function() {
-		field.init('game-field'); 
+		Game.field.init('game-field'); 
 		setReflectorsInStartPosition();
-		ball = new Ball(GAME_SETTINGS.ballSpeed); 
-		ball.setInStartPosition();
-		ball.startDirection();
-		first_player.connectReflector('first-reflector');  
-		second_player.connectReflector('second-reflector');
-		first_player.connectScoreText('first-player-score');
-		second_player.connectScoreText('second-player-score');
+		Game.ball = new Ball(GAME_SETTINGS.ballSpeed);
+		Game.ball.setInStartPosition();
+		Game.ball.startDirection();
+		Game.first_player.connectReflector('first-reflector');  
+		Game.second_player.connectReflector('second-reflector');
+		Game.first_player.connectScoreText('first-player-score');
+		Game.second_player.connectScoreText('second-player-score');
 		Game.stopwatch = new Stopwatch(document.getElementById('game-timer'));
 		addEvent(document.getElementById('menu').children[0],'click',Game.start);
 		addEvent(document.getElementById('menu').children[1],'click',Game.pause);
@@ -166,8 +165,8 @@ var Game = {
 		 */
 		if ( (Round.isGone == false) && (Game.busy ==false) ) {
 			Game.messegeClear(); 
-			ball.moveFlag = true;
-			ball.show(); 
+			Game.ball.moveFlag = true;
+			Game.ball.show(); 
 			Game.renderingStart();
 			Game.stopwatch.start();
 			Game.busy = true;
@@ -199,12 +198,12 @@ var Game = {
 		Game.stopwatch.stop();
 		Game.stopwatch.reset();
 		Game.stopwatch.timeRefresh();
-		ball.setInStartPosition();
+		Game.ball.setInStartPosition();
 		setReflectorsInStartPosition();
-		ball.startDirection();
-		first_player.resetScore(); 
-		second_player.resetScore(); 
-		ball.show();
+		Game.ball.startDirection();
+		Game.first_player.resetScore(); 
+		Game.second_player.resetScore(); 
+		Game.ball.show();
 		Round.isGone = false;
 		Game.busy = false;
 	},
@@ -229,22 +228,22 @@ var Round = {
 
 	End: function() {	 
 		var winner = '';
-		if (first_player.score >= GAME_SETTINGS.gameMaxScore) {
+		if (Game.first_player.score >= GAME_SETTINGS.gameMaxScore) {
 			winner = '<span style = "color:#FF2819;">Red</span>'; 
-		} else if (second_player.score >= GAME_SETTINGS.gameMaxScore) {
+		} else if (Game.second_player.score >= GAME_SETTINGS.gameMaxScore) {
 			winner = '<span style = "color:#66FF4F;">Green</span>';
 		}
 
 		Game.stop();
 		Game.messege('The Winner is '+winner);
-		ball.hide(); 
+		Game.ball.hide(); 
 		/*Включам защиту от дурака*/
 		Round.isGone = true;
 	},
 
 	isEnd: function() { 
-		return ((first_player.score == GAME_SETTINGS.gameMaxScore) || 
-			(second_player.score == GAME_SETTINGS.gameMaxScore) );
+		return ((Game.first_player.score == GAME_SETTINGS.gameMaxScore) || 
+			(Game.second_player.score == GAME_SETTINGS.gameMaxScore) );
 	}
 
 };
@@ -311,8 +310,8 @@ function Timer(seconds, minuts) {
 	    if (minuts === 0 && seconds === 0) {
 	   	  	clearInterval(Game.TimerAfterGoalID);
 	      	Game.messegeClear();
-	      	ball.show();
-	      	ball.setInStartPosition();
+	      	Game.ball.show();
+	      	Game.ball.setInStartPosition();
 	      	Game.renderingStart();
 	      	Game.TimerAfterGoalID = null;
 	      	Game.stopwatch.start();
@@ -330,7 +329,7 @@ function Timer(seconds, minuts) {
 	    clearInterval(Game.TimerAfterGoalID);
 	    Game.TimerAfterGoalID = null;
 	    Game.messegeClear();
-	    ball.setInStartPosition();
+	    Game.ball.setInStartPosition();
 	  };
 	Timer.obj = this;
 };
@@ -365,8 +364,8 @@ function Ball(speed) {
 	
 	this.setInStartPosition = function() { 
 		/*Ставим по центру поля*/
-		ballEl.style.left = Math.round(parseInt(field.self.clientWidth) / 2 - parseInt(ballEl.offsetWidth) / 2) + 'px';
-		ballEl.style.top = Math.round(parseInt(field.self.clientHeight) / 2 - parseInt(ballEl.offsetHeight) / 2) + 'px';
+		ballEl.style.left = Math.round(parseInt(Game.field.self.clientWidth) / 2 - parseInt(ballEl.offsetWidth) / 2) + 'px';
+		ballEl.style.top = Math.round(parseInt(Game.field.self.clientHeight) / 2 - parseInt(ballEl.offsetHeight) / 2) + 'px';
 	};
 	
 	this.hide = function() {
@@ -443,16 +442,16 @@ function Ball(speed) {
 		}
 
 		var	reflectOX = reflectionOX(),
-			reflectOY = reflectionOY();
-		var	reflectOXOY = (!(reflectOX) && !(reflectOY) && reflectionOXOY());
+				reflectOY = reflectionOY(),
+				reflectOXOY = (!(reflectOX) && !(reflectOY) && reflectionOXOY());
 			/*Идея в том что если возникает опасная ситуация (когда мячик может застрять в рокетке) 
 			то нужно изменить направление мячика на правильное и выкинуть мячик за пределы рокетки 
 			(выкидывать мы будет двойным изменением положения мячика за 1 проход )*/	
-			if ( (Ball.obj.hitTest(first_player.reflector.self) || Ball.obj.hitTest(second_player.reflector.self)) && 
+			if ( (Ball.obj.hitTest(Game.first_player.reflector.self) || Ball.obj.hitTest(Game.second_player.reflector.self)) && 
 				reflectOX ) {
 				Ball.obj.vx = -Ball.obj.vx;
 				Ball.obj.setLeft(Ball.obj.getLeft() + Ball.obj.vx);
-			} else 	if ( (Ball.obj.hitTest(first_player.reflector.self) || Ball.obj.hitTest(second_player.reflector.self)) && 
+			} else 	if ( (Ball.obj.hitTest(Game.first_player.reflector.self) || Ball.obj.hitTest(Game.second_player.reflector.self)) && 
 				reflectOY ) {
 				Ball.obj.vy = -Ball.obj.vy;
 				Ball.obj.setTop(Ball.obj.getTop() + Ball.obj.vy);
@@ -535,7 +534,7 @@ function Player(speed) {
 				this.reflector.setTop(this.reflector.getTop() - this.reflectorSpeed);
 		}
 		Player.prototype.moveDown = function() {
-			if ( (this.reflector.getTop() + this.reflector.height + this.reflectorSpeed <= field.self.offsetHeight) && 
+			if ( (this.reflector.getTop() + this.reflector.height + this.reflectorSpeed <= Game.field.self.offsetHeight) && 
 			(this.locked == false) ) 
 				this.reflector.setTop(this.reflector.getTop() + this.reflectorSpeed);
 		}
@@ -567,10 +566,10 @@ setReflectorsInStartPosition = function() {
 	var first = document.getElementById('first-reflector');
 	var second = document.getElementById('second-reflector');
 	var styles = window.getComputedStyle(first);
-	first.style.left = field.goalMargin + 'px';
-	second.style.right = field.goalMargin + 'px';
+	first.style.left = Game.field.goalMargin + 'px';
+	second.style.right = Game.field.goalMargin + 'px';
 
-	var top = Math.round(parseInt(field.self.clientHeight) / 2 - parseInt(styles.height) / 2) + 'px';
+	var top = Math.round(parseInt(Game.field.self.clientHeight) / 2 - parseInt(styles.height) / 2) + 'px';
 	first.style.top = top;
 	second.style.top = top;
 }
@@ -625,30 +624,30 @@ function random(min, max) {
 // см. explain_direction.png
 function reflectionOX() {
 	//Этот блок переменных содержит результат вычисления методов, чтобы они не вызывались постоянно (жалкое подобие оптимизации)
-	var ballLeft = ball.getLeft(),
-		firstPlayerLeft = first_player.reflector.getLeft(),
-		firstPlayerTop = first_player.reflector.getTop(),
-		secondPlayerLeft = second_player.reflector.getLeft(),
-		secondPlayerTop = second_player.reflector.getTop(),
-		ballTop = ball.getTop(), 
-		thirdBallheight = Math.round(ball.height / 3),
-		ballHitFirst = ball.hitTest(first_player.reflector.self),
-		ballHitSecond = ball.hitTest(second_player.reflector.self),
-		ballDirTopToDown = ball.downToTop(),
-		ballDirDownToTop = ball.topToDown();
+	var ballLeft = Game.ball.getLeft(),
+		firstPlayerLeft = Game.first_player.reflector.getLeft(),
+		firstPlayerTop = Game.first_player.reflector.getTop(),
+		secondPlayerLeft = Game.second_player.reflector.getLeft(),
+		secondPlayerTop = Game.second_player.reflector.getTop(),
+		ballTop = Game.ball.getTop(), 
+		thirdBallheight = Math.round(Game.ball.height / 3),
+		ballHitFirst = Game.ball.hitTest(Game.first_player.reflector.self),
+		ballHitSecond = Game.ball.hitTest(Game.second_player.reflector.self),
+		ballDirTopToDown = Game.ball.downToTop(),
+		ballDirDownToTop = Game.ball.topToDown();
 	return (
 		(
-			(ballLeft + ball.speed <= 0) || (ballLeft >= (field.self.clientWidth - ball.width)) 
+			(ballLeft + Game.ball.speed <= 0) || (ballLeft >= (Game.field.self.clientWidth - Game.ball.width)) 
 			// если вылезли за границы поля по OX сомнительно иначе был бы гол, но перестраховаться не помешает
 		)
 		|| 
 		(
-			(ballLeft <= firstPlayerLeft + first_player.reflector.width ) // не залазит за певую ракетку
+			(ballLeft <= firstPlayerLeft + Game.first_player.reflector.width ) // не залазит за певую ракетку
 			&& 
 			(
 				//thirdBallheight надо для того чтобы верхний левый/правый нижний угол мог выпирать за пределы высоты ротетки
 				(ballTop >= firstPlayerTop - thirdBallheight ) &&  
-				(ballTop + ball.height <= firstPlayerTop + first_player.reflector.height + thirdBallheight )
+				(ballTop + Game.ball.height <= firstPlayerTop + Game.first_player.reflector.height + thirdBallheight )
 			)
 		)
 		||
@@ -660,7 +659,7 @@ function reflectionOX() {
 			( ballHitFirst && (ballDirTopToDown) ) 
 			&&
 			(
-				(ballTop >= firstPlayerTop - ball.height) &&
+				(ballTop >= firstPlayerTop - Game.ball.height) &&
 				(ballTop <= firstPlayerTop ) 
 							
 			)
@@ -671,20 +670,20 @@ function reflectionOX() {
 			( ballHitFirst && (ballDirDownToTop) )
 			&&
 			(
-				(ballTop + ball.width >= firstPlayerTop + first_player.reflector.height) &&
-				(ballTop + ball.width <= firstPlayerTop + first_player.reflector.height + ball.height) 
+				(ballTop + Game.ball.width >= firstPlayerTop + Game.first_player.reflector.height) &&
+				(ballTop + Game.ball.width <= firstPlayerTop + Game.first_player.reflector.height + Game.ball.height) 
 							
 			)
 		) 
 		|| 
 		// почти аналочиная ситуация для второй рокетки 
 		(
-			(ballLeft + ball.width >= secondPlayerLeft) 
+			(ballLeft + Game.ball.width >= secondPlayerLeft) 
 			&& 
 			(
 				(ballTop >= secondPlayerTop -thirdBallheight) 
 				&& 
-				(ballTop + ball.height <= secondPlayerTop + second_player.reflector.height +thirdBallheight)
+				(ballTop + Game.ball.height <= secondPlayerTop + Game.second_player.reflector.height +thirdBallheight)
 			)
 		) 
 		|| 
@@ -693,7 +692,7 @@ function reflectionOX() {
 			( ballHitSecond && (ballDirTopToDown) )
 			&&
 			(
-				(ballTop >= secondPlayerTop - ball.height ) &&
+				(ballTop >= secondPlayerTop - Game.ball.height ) &&
 				(ballTop <= secondPlayerTop ) 
 							
 			)
@@ -704,8 +703,8 @@ function reflectionOX() {
 			&&
 			( 
 				// для второй (красной) рокетки нижний угол
-				(ballTop + ball.height >= secondPlayerTop + second_player.reflector.height) &&
-				(ballTop + ball.height <= secondPlayerTop + ball.height ) 
+				(ballTop + Game.ball.height >= secondPlayerTop + Game.second_player.reflector.height) &&
+				(ballTop + Game.ball.height <= secondPlayerTop + Game.ball.height ) 
 							
 			)
 		)
@@ -715,16 +714,16 @@ function reflectionOX() {
 
 function reflectionOY() { /* редкий случай но тоже надо учитывать если мяч попадёт 
 	на  меньшие стороны рокеток то надо оразить по OY */
-	var ballLeft = ball.getLeft(),
-		ballTop = ball.getTop(), 
-		firstPlayerLeft = first_player.reflector.getLeft(),
-		firstPlayerTop = first_player.reflector.getTop(),
-		secondPlayerLeft = second_player.reflector.getLeft(),
-		secondPlayerTop = second_player.reflector.getTop(), 
-		thirdBallwidth = Math.round(ball.widht / 3);
+	var ballLeft = Game.ball.getLeft(),
+		ballTop = Game.ball.getTop(), 
+		firstPlayerLeft = Game.first_player.reflector.getLeft(),
+		firstPlayerTop = Game.first_player.reflector.getTop(),
+		secondPlayerLeft = Game.second_player.reflector.getLeft(),
+		secondPlayerTop = Game.second_player.reflector.getTop(), 
+		thirdBallwidth = Math.round(Game.ball.widht / 3);
 	return (
 		(
-			(ballTop <= 0) || (ballTop >= (field.self.clientHeight - ball.height) ) /* Общий случай */
+			(ballTop <= 0) || (ballTop >= (Game.field.self.clientHeight - Game.ball.height) ) /* Общий случай */
 		) 
 		|| 
 		(
@@ -732,26 +731,26 @@ function reflectionOY() { /* редкий случай но тоже надо у
 			(
 				/*Смотрим чтобы входил в промежуток по OX */
 				(ballLeft > firstPlayerLeft ) &&  
-				(ballLeft < firstPlayerLeft + first_player.reflector.width - thirdBallwidth )
+				(ballLeft < firstPlayerLeft + Game.first_player.reflector.width - thirdBallwidth )
 			) 
 			&& 
 			(
 				/*И касался верних и нижних сторон рокетки */
-				(ballTop + ball.height >= firstPlayerTop ) || 
-				(ballTop <= firstPlayerTop + first_player.reflector.height )
+				(ballTop + Game.ball.height >= firstPlayerTop ) || 
+				(ballTop <= firstPlayerTop + Game.first_player.reflector.height )
 			)
 		) 
 		|| 
 		(
 		/* Аналогично для второй рокетки */
 			(
-				(ballLeft + ball.width > secondPlayerLeft + thirdBallwidth ) && 
-				(ballLeft + ball.width < secondPlayerLeft + second_player.reflector.width)
+				(ballLeft + Game.ball.width > secondPlayerLeft + thirdBallwidth ) && 
+				(ballLeft + Game.ball.width < secondPlayerLeft + Game.second_player.reflector.width)
 			) 
 			&& 
 			(
-				(ballTop + ball.height >= secondPlayerTop ) || 
-				(ballTop <= secondPlayerTop + second_player.reflector.height )
+				(ballTop + Game.ball.height >= secondPlayerTop ) || 
+				(ballTop <= secondPlayerTop + Game.second_player.reflector.height )
 			)
 		)
 	);
@@ -759,7 +758,7 @@ function reflectionOY() { /* редкий случай но тоже надо у
 
 
 function reflectionOXOY() { // во всех остальных случаях надо отражать по всем направлениям
-	return (ball.hitTest(first_player.reflector.self) || ball.hitTest(second_player.reflector.self)
+	return (Game.ball.hitTest(Game.first_player.reflector.self) || Game.ball.hitTest(Game.second_player.reflector.self)
 	);
 
 }
@@ -767,12 +766,12 @@ function reflectionOXOY() { // во всех остальных случаях �
 
 
 function isGoal() { 
-	var OX = ball.getLeft();
-	if (OX + ball.speed <= field.goalMarginLeft()) { 
-		first_player.goal(); 
+	var OX = Game.ball.getLeft();
+	if (OX + Game.ball.speed <= Game.field.goalMarginLeft()) { 
+		Game.first_player.goal(); 
 	}
-	if (OX + ball.width >= field.goalMarginRight()) {
-		second_player.goal();
+	if (OX + Game.ball.width >= Game.field.goalMarginRight()) {
+		Game.second_player.goal();
 	}
-	return (OX + ball.speed <= field.goalMarginLeft() || OX + ball.width >= field.goalMarginRight())
+	return (OX + Game.ball.speed <= Game.field.goalMarginLeft() || OX + Game.ball.width >= Game.field.goalMarginRight())
 }
